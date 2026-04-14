@@ -67,7 +67,7 @@ try:
         selection = st.dataframe(
             df_filtrado, 
             hide_index=True, 
-            use_container_width=True,
+            width='stretch',
             on_select="rerun",
             selection_mode="single-row",
             column_config={
@@ -106,7 +106,7 @@ try:
                 fig_clase = px.pie(data_clase, values="Valor", names="Clase", hole=0.4,
                                    title="Composición", color="Clase",
                                    color_discrete_map=COLOR_CLASES, template=PLOTLY_TEMPLATE)
-                st.plotly_chart(fig_clase, use_container_width=True)
+                st.plotly_chart(fig_clase, width='stretch')
 
             # Gráfico 2: Regiones
             with g2:
@@ -118,7 +118,7 @@ try:
                                  color="Región", text="Valor",
                                  color_discrete_map=COLOR_REGIONES, template=PLOTLY_TEMPLATE)
                 fig_reg.update_traces(**CONFIG_BARRA_PCT)
-                st.plotly_chart(fig_reg, use_container_width=True)
+                st.plotly_chart(fig_reg, width='stretch')
 
             # Gráfico 3: Sectores (Sunburst)
             with g3:
@@ -138,7 +138,7 @@ try:
                                          title="Desglose Sectorial", color="Supersector",
                                          color_discrete_map=COLOR_SECTORES, template=PLOTLY_TEMPLATE)
                     fig_sun.update_traces(textinfo="label+percent entry", texttemplate="%{label}<br>%{value:.1f}%")
-                    st.plotly_chart(fig_sun, use_container_width=True)
+                    st.plotly_chart(fig_sun, width='stretch')
                 else:
                     st.warning("Sin datos sectoriales")
 

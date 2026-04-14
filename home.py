@@ -1,14 +1,24 @@
 import streamlit as st
-import pandas as pd
-from database import run_query
-import os
-from styles import MONEDA_CONFIG, mostrar_logo_entidad, mostrar_logo_total
 
-st.set_page_config(page_title="Dashboard Patrimonio", layout="wide")
+st.set_page_config(page_title="Finanzas Personales", layout="wide")
 
-# --- 1. CABECERA ---
-st.title("🏦 Estado Global del Patrimonio")
-st.write(f"Última actualización: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}")
+# DESPUÉS
+pg = st.navigation({
+    "": [st.Page("pages/dashboard.py",  title="🏦 Patrimonio", default=True)],
+    "Movimientos": [
+        st.Page("pages/tesoreria.py",  title="💰 Tesorería"),
+        st.Page("pages/inversiones.py", title="📈 Inversiones"),
+    ],
+    "Cartera": [
+        st.Page("pages/ver_descrip_activos.py", title="📋 Ver Activos"),
+        st.Page("pages/crear_activo.py",        title="🛡️ Crear Activo"),
+        st.Page("pages/editar_activo.py",       title="✏️ Editar Activo"),
+    ],
+    "Configuración": [
+        st.Page("pages/ref_tablas.py", title="⚙️ Tablas de Referencia"),
+    ],
+})
+pg.run()
 
 
 
