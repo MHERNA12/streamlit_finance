@@ -105,7 +105,7 @@ with tab_nuevo:
         c6, c7 = st.columns([2, 2])
         unidades = c6.number_input(
             "🔢 Unidades / Participaciones",
-            min_value=0.0001, step=1.0, format="%.4f",
+            min_value=0.0001, step=1.0, format="%.5f",
         )
         precio_unitario = c7.number_input(
             "💵 Precio unitario (€)",

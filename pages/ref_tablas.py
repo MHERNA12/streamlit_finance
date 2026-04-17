@@ -41,13 +41,23 @@ if tabla_seleccionada:
 # Sección para insertar (Uso de transacciones con SQLAlchemy)
 with st.expander(f"Añadir nuevo registro a {tabla_seleccionada}"):
     nuevo_nombre = st.text_input("Nombre del nuevo elemento:")
+    
+    # Campo extra solo para ref_origen_transaccion
+    nuevo_tipo = None
+    if tablas[tabla_seleccionada] == "ref_origen_transaccion":
+        nuevo_tipo = st.selectbox("Tipo", ["INGRESO", "GASTO"])
+    
     if st.button("Guardar"):
         if nuevo_nombre:
             try:
                 engine = get_engine()
-                with engine.begin() as conn: # .begin() maneja el COMMIT automáticamente
-                    query = text(f"INSERT INTO {tablas[tabla_seleccionada]} (nombre) VALUES (:val)")
-                    conn.execute(query, {"val": nuevo_nombre})
+                with engine.begin() as conn:
+                    if tablas[tabla_seleccionada] == "ref_origen_transaccion":
+                        query = text("INSERT INTO ref_origen_transaccion (nombre, tipo) VALUES (:val, :tipo)")
+                        conn.execute(query, {"val": nuevo_nombre, "tipo": nuevo_tipo})
+                    else:
+                        query = text(f"INSERT INTO {tablas[tabla_seleccionada]} (nombre) VALUES (:val)")
+                        conn.execute(query, {"val": nuevo_nombre})
                 st.success(f"'{nuevo_nombre}' añadido correctamente.")
                 st.rerun()
             except Exception as e:

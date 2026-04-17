@@ -199,10 +199,16 @@ with tab_registrar:
             )
 
         st.divider()
-        guardar_btn = st.form_submit_button("💾 Guardar todos los precios", type="primary", use_container_width=True)
+        guardar_btn = st.form_submit_button("💾 Guardar todos los precios", type="primary", width='stretch')
 
     # --- Preview de valoración — siempre desde session_state ---
     st.subheader("📊 Vista previa de valoración")
+    df_ultima_fecha = run_query("SELECT MAX(fecha) AS ultima_fecha FROM historico_precios")
+    ultima_fecha_precio = df_ultima_fecha.iloc[0]["ultima_fecha"]
+    if ultima_fecha_precio:
+        st.caption(f"📅 Valoración calculada con precios de: **{pd.to_datetime(ultima_fecha_precio).strftime('%d/%m/%Y')}**")
+    else:
+        st.caption("📅 No hay precios registrados aún en el histórico.")
     filas_preview = []
     for m in meta_activos:
         precio_actual = float(st.session_state.get(m["key_precio"], 0.0))
@@ -233,20 +239,38 @@ with tab_registrar:
     m3.metric("✨ Plusvalía latente", fmt_eur2(total_plus), delta=f"{total_pct:+.2f}%")
     m4.metric("📋 Activos en cartera", len(df_preview))
 
-    st.dataframe(
-        df_preview,
-        hide_index=True,
-        use_container_width=True,
-        column_config={
-            "Entidad":       st.column_config.TextColumn("🏦 Entidad"),
-            "Unidades":      st.column_config.NumberColumn(format="%.4f"),
-            "Coste total":   st.column_config.NumberColumn("Coste (€)",     format="%.2f €"),
-            "Precio actual": st.column_config.NumberColumn("Precio (€)",    format="%.6f €"),
-            "Valor actual":  st.column_config.NumberColumn("Valor (€)",     format="%.2f €"),
-            "Plusvalía €":   st.column_config.NumberColumn("Plusvalía (€)", format="%.2f €"),
-            "Plusvalía %":   st.column_config.NumberColumn("Plusvalía (%)", format="%.2f%%"),
-        }
-    )
+    st.divider()
+
+    # --- Expanders por entidad ---
+    for entidad_nombre in df_preview["Entidad"].unique():
+        df_ent = df_preview[df_preview["Entidad"] == entidad_nombre].copy()
+
+        tc_ent = df_ent["Coste total"].sum()
+        tv_ent = df_ent["Valor actual"].sum()
+        tp_ent = tv_ent - tc_ent
+        pct_ent = (tp_ent / tc_ent * 100) if tc_ent > 0 else 0
+
+        with st.expander(f"🏦 {entidad_nombre}  —  Coste: {fmt_eur2(tc_ent)}  |  Valor: {fmt_eur2(tv_ent)}  |  Plusvalía: {fmt_eur2(tp_ent)} ({pct_ent:+.2f}%)", 
+                         expanded=False):
+            e1, e2, e3, e4 = st.columns(4)
+            e1.metric("💰 Coste invertido",  fmt_eur2(tc_ent))
+            e2.metric("📈 Valor actual",     fmt_eur2(tv_ent))
+            e3.metric("✨ Plusvalía latente", fmt_eur2(tp_ent), delta=f"{pct_ent:+.2f}%")
+            e4.metric("📋 Activos",          len(df_ent))
+
+            st.dataframe(
+                df_ent.drop(columns=["Entidad"]),
+                hide_index=True,
+                width='stretch',
+                column_config={
+                    "Unidades":      st.column_config.NumberColumn(format="%.4f"),
+                    "Coste total":   st.column_config.NumberColumn("Coste (€)",     format="%.2f €"),
+                    "Precio actual": st.column_config.NumberColumn("Precio (€)",    format="%.6f €"),
+                    "Valor actual":  st.column_config.NumberColumn("Valor (€)",     format="%.2f €"),
+                    "Plusvalía €":   st.column_config.NumberColumn("Plusvalía (€)", format="%.2f €"),
+                    "Plusvalía %":   st.column_config.NumberColumn("Plusvalía (%)", format="%.2f%%"),
+                }
+            )
 
     # --- Guardado ---
     if guardar_btn:
@@ -351,7 +375,7 @@ with tab_historial:
         st.dataframe(
             df_mostrar.drop(columns=["id", "Registrado"]),
             hide_index=True,
-            use_container_width=True,
+            width='stretch',
             column_config={
                 "Fecha":      st.column_config.DateColumn("📅 Fecha", format="DD/MM/YYYY"),
                 "Precio (€)": st.column_config.NumberColumn("Precio (€)", format="%.6f €"),
@@ -397,7 +421,7 @@ with tab_editar:
         selection = st.dataframe(
             df_edit_src.drop(columns=["id"]),
             hide_index=True,
-            use_container_width=True,
+            width='stretch',
             on_select="rerun",
             selection_mode="single-row",
             column_config={
@@ -446,7 +470,7 @@ with tab_editar:
                 btn_actualizar = btn_col1.form_submit_button(
                     "📝 Actualizar registro",
                     type="primary",
-                    use_container_width=True
+                    width='stretch'
                 )
                 # Placeholder para mantener layout
                 btn_col2.empty()
