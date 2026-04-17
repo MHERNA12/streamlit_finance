@@ -38,5 +38,9 @@ def cargar_referencias():
     # 4. Estrategias / Categorías
     df_estrategias = run_query("SELECT id, nombre FROM ref_estrategia ORDER BY nombre")
     dict_estrategias = dict(zip(df_estrategias['nombre'], df_estrategias['id']))
-    
-    return df_activos, dict_tipos, dict_entidades, dict_estrategias
+
+    # 5. Orígenes de transacción (separados por tipo INGRESO/GASTO)
+    df_origenes = run_query("SELECT id, nombre, tipo FROM ref_origen_transaccion ORDER BY tipo, nombre")
+    dict_origenes = dict(zip(df_origenes['nombre'], df_origenes['id']))
+ 
+    return df_activos, dict_tipos, dict_entidades, dict_estrategias, dict_origenes, df_origenes

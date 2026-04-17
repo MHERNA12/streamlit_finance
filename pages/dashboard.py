@@ -37,36 +37,7 @@ st.caption(f"Última actualización: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%
 # Saldo por entidad desglosado en tesorería e inversión
 # Tesorería: movimientos operativa='TESORERIA' (Ingreso suma, Gasto resta)
 # Inversión:  movimientos operativa='INVERSION'  (Compra resta, Venta suma)
-df_resumen = run_query("""
-    SELECT
-        e.nombre                                                AS entidad,
-
-        -- TESORERÍA: saldo neto de ingresos y gastos
-        SUM(CASE
-            WHEN t.operativa = 'TESORERIA' AND rt.nombre = 'Ingreso' THEN  t.importe_total
-            WHEN t.operativa = 'TESORERIA' AND rt.nombre = 'Gasto'   THEN -t.importe_total
-            ELSE 0
-        END)                                                    AS saldo_tesoreria,
-
-        -- INVERSIÓN: capital neto (coste de compras menos ingresos de ventas)
-        SUM(CASE
-            WHEN t.operativa = 'INVERSION' AND rt.nombre = 'Compra' THEN  t.importe_total
-            WHEN t.operativa = 'INVERSION' AND rt.nombre = 'Venta'  THEN -t.importe_total
-            ELSE 0
-        END)                                                    AS capital_invertido
-
-    FROM transacciones t
-    JOIN ref_entidad          e  ON t.entidad_id          = e.id
-    JOIN ref_tipo_transaccion rt ON t.tipo_transaccion_id = rt.id
-    GROUP BY e.nombre
-    ORDER BY (SUM(CASE
-            WHEN t.operativa = 'TESORERIA' AND rt.nombre = 'Ingreso' THEN  t.importe_total
-            WHEN t.operativa = 'TESORERIA' AND rt.nombre = 'Gasto'   THEN -t.importe_total
-            WHEN t.operativa = 'INVERSION' AND rt.nombre = 'Compra' THEN  t.importe_total
-            WHEN t.operativa = 'INVERSION' AND rt.nombre = 'Venta'  THEN -t.importe_total
-            ELSE 0
-        END)) DESC
-""")
+df_resumen = run_query("SELECT * FROM v_resumen_patrimonio")
 
 # ---------------------------------------------------------------------------
 # 3. TARJETAS POR ENTIDAD + TOTAL GLOBAL
@@ -137,74 +108,100 @@ st.divider()
 # 4. DESGLOSE DETALLADO DE ACTIVOS
 # ---------------------------------------------------------------------------
 st.subheader("📊 Distribución por Activos")
-
-df_activos = run_query("""
+ 
+# --- Carga de datos ---
+df_inversion = run_query("""
     SELECT
-        e.nombre                                                AS "Entidad",
-        a.denominacion                                          AS "Activo",
-        t.operativa                                             AS "Tipo",
-
-        -- Unidades netas (solo inversión)
-        SUM(CASE
-            WHEN rt.nombre = 'Compra' THEN  t.unidades
-            WHEN rt.nombre = 'Venta'  THEN -t.unidades
-            ELSE 0
-        END)                                                    AS "Unidades",
-
-        -- Saldo neto en euros
-        SUM(CASE
-            WHEN rt.nombre IN ('Ingreso', 'Compra') THEN  t.importe_total
-            WHEN rt.nombre IN ('Gasto',  'Venta')   THEN -t.importe_total
-            ELSE 0
-        END)                                                    AS "Saldo (€)"
-
-    FROM transacciones t
-    JOIN ref_entidad          e  ON t.entidad_id          = e.id
-    JOIN activos_descripcion  a  ON t.isin                = a.isin
-    JOIN ref_tipo_transaccion rt ON t.tipo_transaccion_id = rt.id
-    GROUP BY e.nombre, a.denominacion, t.operativa
-    HAVING SUM(CASE
-            WHEN rt.nombre IN ('Ingreso', 'Compra') THEN  t.importe_total
-            WHEN rt.nombre IN ('Gasto',  'Venta')   THEN -t.importe_total
-            ELSE 0
-        END) != 0
-    ORDER BY e.nombre, t.operativa, "Saldo (€)" DESC
+        entidad     AS "Entidad",
+        activo      AS "Activo",
+        unidades    AS "Unidades",
+        coste_total AS "Coste (€)"
+    FROM v_estado_activos
+    ORDER BY entidad, "Coste (€)" DESC
 """)
-
-if not df_activos.empty:
-    # Etiqueta legible para el tipo
-    df_activos["Tipo"] = df_activos["Tipo"].map(
-        {"TESORERIA": "💰 Tesorería", "INVERSION": "📈 Inversión"}
-    )
-
-    st.dataframe(
-        df_activos,
-        width='stretch',
-        hide_index=True,
-        column_config={
-            "Entidad":   st.column_config.TextColumn("🏦 Entidad"),
-            "Activo":    st.column_config.TextColumn("Activo / Instrumento"),
-            "Tipo":      st.column_config.TextColumn("Tipo"),
-            "Unidades":  st.column_config.NumberColumn("Unidades", format="%.4f"),
-            "Saldo (€)": st.column_config.NumberColumn("Saldo / Coste (€)", format="%.2f €"),
-        },
-    )
-
+ 
+df_tesoreria = run_query("""
+    SELECT
+        entidad AS "Entidad",
+        activo  AS "Activo",
+        saldo   AS "Saldo (€)"
+    FROM v_saldo_tesoreria
+    ORDER BY entidad, "Saldo (€)" DESC
+""")
+ 
+# --- Filtro por entidad (sobre la unión de ambas tablas) ---
+entidades_disponibles = sorted(set(
+    list(df_inversion["Entidad"].unique() if not df_inversion.empty else []) +
+    list(df_tesoreria["Entidad"].unique() if not df_tesoreria.empty else [])
+))
+entidad_sel = st.multiselect(
+    "🏦 Filtrar por entidad",
+    options=entidades_disponibles,
+    default=entidades_disponibles,
+)
+ 
+# Aplicar filtro
+if entidad_sel:
+    df_inv_f  = df_inversion[df_inversion["Entidad"].isin(entidad_sel)] if not df_inversion.empty else df_inversion
+    df_teso_f = df_tesoreria[df_tesoreria["Entidad"].isin(entidad_sel)] if not df_tesoreria.empty else df_tesoreria
+else:
+    df_inv_f, df_teso_f = df_inversion, df_tesoreria
+ 
+# --- Dos columnas ---
+col_inv, col_teso = st.columns(2)
+ 
+with col_inv:
+    st.markdown("#### 📈 Inversión")
+    if df_inv_f.empty:
+        st.info("No hay posiciones abiertas de inversión.")
+    else:
+        st.dataframe(
+            df_inv_f,
+            width='stretch',
+            hide_index=True,
+            column_config={
+                "Entidad":   st.column_config.TextColumn("🏦 Entidad"),
+                "Activo":    st.column_config.TextColumn("Activo"),
+                "Unidades":  st.column_config.NumberColumn("Unidades", format="%.4f"),
+                "Coste (€)": st.column_config.NumberColumn("Coste (€)", format="%.2f €"),
+            },
+        )
+        total_inv_f = df_inv_f["Coste (€)"].sum()
+        st.caption(f"**Total coste:** {fmt(total_inv_f)}")
+ 
+with col_teso:
+    st.markdown("#### 💰 Tesorería")
+    if df_teso_f.empty:
+        st.info("No hay saldos de tesorería.")
+    else:
+        st.dataframe(
+            df_teso_f,
+            width='stretch',
+            hide_index=True,
+            column_config={
+                "Entidad":   st.column_config.TextColumn("🏦 Entidad"),
+                "Activo":    st.column_config.TextColumn("Cuenta"),
+                "Saldo (€)": st.column_config.NumberColumn("Saldo (€)", format="%.2f €"),
+            },
+        )
+        total_teso_f = df_teso_f["Saldo (€)"].sum()
+        st.caption(f"**Total saldo:** {fmt(total_teso_f)}")
+ 
 st.divider()
-
+ 
 # ---------------------------------------------------------------------------
 # 5. ANALÍTICA RÁPIDA
 # ---------------------------------------------------------------------------
 c1, c2, c3 = st.columns(3)
-
+ 
 with c1:
     n_entidades = len(df_resumen)
     st.info(f"Tienes activos en **{n_entidades}** entidad{'es' if n_entidades != 1 else ''}.")
-
+ 
 with c2:
     pct_teso = (total_tesoreria / total_global * 100) if total_global else 0
     st.info(f"Tu liquidez (Tesorería) es el **{pct_teso:.1f}%** del patrimonio total.")
-
+ 
 with c3:
     pct_inv = (total_inversion / total_global * 100) if total_global else 0
     st.info(f"Tu capital invertido representa el **{pct_inv:.1f}%** del patrimonio total.")

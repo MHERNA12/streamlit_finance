@@ -18,7 +18,8 @@ tablas = {
     "Estrategias": "ref_estrategia",
     "Sectores Detallados": "ref_sector",
     "Sectores económicos": "ref_macro_sector",
-    "Regiones": "ref_region"
+    "Regiones": "ref_region",
+    "Origen Ingreso-Gasto":"ref_origen_transaccion"
 }
 
 # Selector en la interfaz

@@ -9,6 +9,9 @@ pg = st.navigation({
         st.Page("pages/tesoreria.py",  title="💰 Tesorería"),
         st.Page("pages/inversiones.py", title="📈 Inversiones"),
     ],
+    "Cotizaciones": [
+        st.Page("pages/historico_precios.py",  title="💹 Precios"),
+    ],
     "Cartera": [
         st.Page("pages/ver_descrip_activos.py", title="📋 Ver Activos"),
         st.Page("pages/crear_activo.py",        title="🛡️ Crear Activo"),
